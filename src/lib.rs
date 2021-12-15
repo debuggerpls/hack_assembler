@@ -1,7 +1,6 @@
 use std::fs;
 use std::error::Error;
 use std::collections::HashMap;
-use std::ops::Add;
 
 pub struct Config {
     input_file: String,
@@ -46,27 +45,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
                     parser.lines.remove(parser.current_instruction);
                     break;
                 }
-
             }
-            // Some(Instruction::A) => {
-            //
-            //     match parser.symbol().unwrap().parse::<i32>() {
-            //         Ok(num) => {
-            //             let binary = format!("{:016b}", num);
-            //             // println!("{}", s);
-            //             assembler.add_bytecode(&binary);
-            //         },
-            //         _ => println!("Unknown yet"),
-            //     }
-            // },
-            // Some(Instruction::C) => {
-            //     let mut binary = String::from("111");
-            //     binary += &Code::comp(parser.comp());
-            //     binary += &Code::dest(parser.dest());
-            //     binary += &Code::jump(parser.jump());
-            //     // println!("{}", binary);
-            //     assembler.add_bytecode(&binary);
-            // }
             _ => (),
         }
 
@@ -84,14 +63,26 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     loop {
         match parser.instruction_type() {
             Some(Instruction::A) => {
-
                 match parser.symbol().unwrap().parse::<i32>() {
                     Ok(num) => {
                         let binary = format!("{:016b}", num);
-                        // println!("{}", s);
                         assembler.add_bytecode(&binary);
                     },
-                    _ => println!("Unknown yet"),
+                    _ => {
+                        // ether label or variable
+                        if symbols.contains(&parser.symbol().unwrap()) {
+                            let address: &i32 = symbols.get_address(&parser.symbol().unwrap()).unwrap();
+                            let binary = format!("{:016b}", address);
+                            assembler.add_bytecode(&binary);
+                        } else {
+                            // this is a variable
+                            let binary = format!("{:016b}", parser.current_variable_address);
+                            assembler.add_bytecode(&binary);
+
+                            symbols.add_entry(parser.symbol().unwrap(), parser.current_variable_address);
+                            parser.current_variable_address += 1;
+                        }
+                    },
                 }
             },
             Some(Instruction::C) => {
@@ -99,7 +90,6 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
                 binary += &Code::comp(parser.comp());
                 binary += &Code::dest(parser.dest());
                 binary += &Code::jump(parser.jump());
-                // println!("{}", binary);
                 assembler.add_bytecode(&binary);
             }
             _ => (),
@@ -120,6 +110,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 struct Parser {
     lines: Vec<String>,
     current_instruction: usize,
+    current_variable_address: i32,
 }
 
 #[derive(Debug)]
@@ -140,6 +131,7 @@ impl Parser {
         let mut parser = Parser {
             lines: Vec::new(),
             current_instruction: 0,
+            current_variable_address: 16
         };
 
         parser.lines = contents
@@ -278,11 +270,13 @@ impl Code {
             Some(d) => match &d[..] {
                 "M" => String::from("001"),
                 "D" => String::from("010"),
-                "DM" => String::from("011"),
+                "DM" => String::from("011"), // as defined in assembler slides
+                "MD" => String::from("011"), // as used in project/06/rect
                 "A" => String::from("100"),
                 "AM" => String::from("101"),
                 "AD" => String::from("110"),
-                "ADM" => String::from("111"),
+                "ADM" => String::from("111"), // as defined in assembler slides
+                "AMD" => String::from("111"), // as used in projects/05/CPU.tst:67: // AMD=D+A
                 _ => panic!("Invalid dest: {}", d),
             }
         }
