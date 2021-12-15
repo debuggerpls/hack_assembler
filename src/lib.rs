@@ -29,14 +29,56 @@ impl Config {
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let mut assembler = HackAssembler::new(&config);
     let mut parser = Parser::new(&config)?;
+    let mut symbols = SymbolTable::new();
 
     // First pass
-    // let line_nr = 0;
-    // loop {
-    //     if parser.instruction_type() == Some(Instruction::L) {
-    //
-    //     }
-    // }
+    loop {
+        match parser.instruction_type() {
+            Some(Instruction::L) => {
+                // add to the symbol table
+                symbols.add_entry(parser.symbol().unwrap(), parser.current_instruction as i32);
+                // remove that line, so further symbols match the lines
+                if parser.has_more_lines() {
+                    // do not advance here!
+                    parser.lines.remove(parser.current_instruction);
+                    continue;
+                } else {
+                    parser.lines.remove(parser.current_instruction);
+                    break;
+                }
+
+            }
+            // Some(Instruction::A) => {
+            //
+            //     match parser.symbol().unwrap().parse::<i32>() {
+            //         Ok(num) => {
+            //             let binary = format!("{:016b}", num);
+            //             // println!("{}", s);
+            //             assembler.add_bytecode(&binary);
+            //         },
+            //         _ => println!("Unknown yet"),
+            //     }
+            // },
+            // Some(Instruction::C) => {
+            //     let mut binary = String::from("111");
+            //     binary += &Code::comp(parser.comp());
+            //     binary += &Code::dest(parser.dest());
+            //     binary += &Code::jump(parser.jump());
+            //     // println!("{}", binary);
+            //     assembler.add_bytecode(&binary);
+            // }
+            _ => (),
+        }
+
+        if !parser.has_more_lines() {
+            break;
+        }
+
+        parser.advance();
+    }
+
+    // reset parser
+    parser.current_instruction = 0;
 
     // Second pass
     loop {
@@ -143,7 +185,32 @@ impl Parser {
     fn symbol(&self) -> Option<String> {
         let line = &self.lines[self.current_instruction];
         match self.instruction_type() {
-            Some(Instruction::A) => Some(line[1..].to_string()),
+            Some(Instruction::A) => match &line[1..] {
+                "R0" => Some("0".to_string()),
+                "R1" => Some("1".to_string()),
+                "R2" => Some("2".to_string()),
+                "R3" => Some("3".to_string()),
+                "R4" => Some("4".to_string()),
+                "R5" => Some("5".to_string()),
+                "R6" => Some("6".to_string()),
+                "R7" => Some("7".to_string()),
+                "R8" => Some("8".to_string()),
+                "R9" => Some("9".to_string()),
+                "R10" => Some("10".to_string()),
+                "R11" => Some("11".to_string()),
+                "R12" => Some("12".to_string()),
+                "R13" => Some("13".to_string()),
+                "R14" => Some("14".to_string()),
+                "R15" => Some("15".to_string()),
+                "SCREEN" => Some("16384".to_string()),
+                "KBD" => Some("24576".to_string()),
+                "SP" => Some("0".to_string()),
+                "LCL" => Some("1".to_string()),
+                "ARG" => Some("2".to_string()),
+                "THIS" => Some("3".to_string()),
+                "THAT" => Some("4".to_string()),
+                _ => Some(line[1..].to_string()),
+            },
             Some(Instruction::L) => {
                 let matches: &[_] = &['(', ')'];
                 Some(line.trim_matches(matches).to_string())
@@ -387,6 +454,15 @@ D=0
 @2
 @sum
 D=0
+@R2
+@R15
+@SCREEN
+@KBD
+@SP
+@LCL
+@ARG
+@THIS
+@THAT
 (END)");
 
         let mut parser = Parser::create(contents);
@@ -396,6 +472,24 @@ D=0
         assert_eq!(parser.symbol(), Some("sum".to_string()));
         parser.advance();
         assert_eq!(parser.symbol(), None);
+        parser.advance();
+        assert_eq!(parser.symbol(), Some("2".to_string()));
+        parser.advance();
+        assert_eq!(parser.symbol(), Some("15".to_string()));
+        parser.advance();
+        assert_eq!(parser.symbol(), Some("16384".to_string()));
+        parser.advance();
+        assert_eq!(parser.symbol(), Some("24576".to_string()));
+        parser.advance();
+        assert_eq!(parser.symbol(), Some("0".to_string()));
+        parser.advance();
+        assert_eq!(parser.symbol(), Some("1".to_string()));
+        parser.advance();
+        assert_eq!(parser.symbol(), Some("2".to_string()));
+        parser.advance();
+        assert_eq!(parser.symbol(), Some("3".to_string()));
+        parser.advance();
+        assert_eq!(parser.symbol(), Some("4".to_string()));
         parser.advance();
         assert_eq!(parser.symbol(), Some("END".to_string()));
     }
